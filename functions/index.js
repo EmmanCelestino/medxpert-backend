@@ -248,3 +248,90 @@ exports.onAppointmentCancellation = functions.firestore.document('appointments/{
   }
 
 })
+
+exports.onClinicCreate = functions.firestore.document('clinics/{userId}').onCreate( async (snap , context) => {
+
+  let newClinic = snap.data()
+
+  let subscriptionPlan = await admin.firestore().collection('subscriptionPlans').doc(newClinic.planId).get()
+
+  const smtpTransport = mailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: functions.config().gmail.email_address,
+      pass: functions.config().gmail.passkey
+    }
+  })
+
+  const emailAddress = newClinic.emailAddress;
+
+  const emailContent = `
+    <html>
+      <body>
+          <div style="width: 100%; font-family: Roboto;" class="content">
+            <div>
+              <h2 style="text-align: center; font-weight: 700; color : #3E6680; ">Welcome to medXpert!</h2>
+            </div>
+            <div style="margin-top: 50px; color: black;">
+              <p>Hi ${newClinic.name},</p>
+              <br/>
+              <p>Our team would like to extend gratitude for registering for our web app. We will do our best to provide you streamline care which is fast, efficient, and effective.</p>
+              <br/>
+              <p>Subscription details</p>
+              <table style="width: 100%">
+                <thead>
+                  <tr>
+                    <th style="text-align: center; border: 1px solid black;">Description</th>
+                    <th style="text-align: center; border: 1px solid black;">No. of users</th>
+                    <th style="text-align: center; border: 1px solid black;">Monthly Fees</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="text-align: center; border: 1px solid black;">${subscriptionPlan.data().description}</td>
+                    <td style="text-align: center; border: 1px solid black;">${subscriptionPlan.data().noOfUsers}</td>
+                    <td style="text-align: center; border: 1px solid black;">PhP ${subscriptionPlan.data().monthlyFees.toFixed(2)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <br/>
+              <p>If you wish to upgrade your plan. Contact us through email at medexpert.noreplymail@gmail.com</p>
+              <br/>
+              <br/>
+              <p>Yours truly,</p>
+              <p>Our medXpert team</p>
+            </div>
+          </div>
+      </body>
+    </html>
+  `
+
+  const mail = {
+    from: functions.config().gmail.email_address,
+    to: emailAddress,
+    subject: "Welcome to medXpert",
+    text: emailContent,
+    html: emailContent
+  }
+  
+  smtpTransport.sendMail(mail, (error, response) => {
+
+    let code = 200
+    let message = "Email sent successfully!"
+
+    if (error) {
+      console.error(error);
+      console.error("[ERROR] Email not sent.")
+      code = 500
+      message = "Email not sent. Something went wrong"
+      
+    } else {
+      console.info("[SUCCESS] Welcome email sent to "+emailAddress)
+    }
+
+    smtpTransport.close();
+    return { code : code, message : message }
+    
+  })
+
+})
