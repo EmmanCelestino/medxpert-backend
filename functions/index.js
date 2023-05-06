@@ -136,7 +136,7 @@ exports.onAppointmentCreate = functions.firestore.document('appointments/{appoin
     const mail = {
       from: functions.config().gmail.email_address,
       to: emailAddress,
-      subject: "Welcome to medXpert",
+      subject: "Appointment confirmation",
       text: emailContent,
       html: emailContent
     }
@@ -153,7 +153,7 @@ exports.onAppointmentCreate = functions.firestore.document('appointments/{appoin
         message = "Email not sent. Something went wrong"
         
       } else {
-        console.info("[SUCCESS] Welcome email sent to "+emailAddress)
+        console.info("[SUCCESS] Appointment creation email sent to "+emailAddress)
       }
 
       smtpTransport.close();
@@ -163,6 +163,88 @@ exports.onAppointmentCreate = functions.firestore.document('appointments/{appoin
 
   }
 
-  
+})
+
+exports.onAppointmentCancellation = functions.firestore.document('appointments/{appointmentId}').onUpdate( async (snap , context) => {
+
+  let newAppointment = snap.after.data()
+
+  const smtpTransport = mailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: functions.config().gmail.email_address,
+      pass: functions.config().gmail.passkey
+    }
+  })
+
+  let patient = await admin.firestore().collection('patients').doc(newAppointment.patientUid).get()
+  let clinic = await admin.firestore().collection('clinics').doc(newAppointment.clinicUid).get()
+  let doctor = await admin.firestore().collection('doctors').doc(newAppointment.doctorUid).get()
+
+  let user
+
+  if(patient.data()){
+    user = await admin.firestore().collection('users').doc(patient.data().userUid).get()
+  }
+
+  if(user){
+
+    const emailAddress = user.data().emailAddress;
+
+    let emailContent = ``
+
+    if(newAppointment.status=="cancelled"){
+      emailContent = `
+        <html>
+          <body>
+              <div style="width: 100%; font-family: Roboto;" class="content">
+                <div>
+                  <h2 style="text-align: center; font-weight: 700; color : #3E6680; ">Appointment Cancellation</h2>
+                </div>
+                <div style="margin-top: 50px; color: black;">
+                  <p>Hi ${user.data().firstName},</p>
+                  <br/>
+                  <p>Your appointment with ${clinic.data().name} - Dr. ${doctor.data().firstName} ${doctor.data().lastName} on ${moment.unix(newAppointment.appointmentDate.seconds).format("dddd, LL")} is now cancelled.</p>
+                  <p>${newAppointment.cancellationReason?`The reason for cancellation is : `:``}</p>
+                  <br/>
+                  <br/>
+                  <p>Yours truly,</p>
+                  <p>Our medXpert team</p>
+                </div>
+              </div>
+          </body>
+        </html>
+      `
+    }
+
+    const mail = {
+      from: functions.config().gmail.email_address,
+      to: emailAddress,
+      subject: "Appointment cancellation",
+      text: emailContent,
+      html: emailContent
+    }
+    
+    smtpTransport.sendMail(mail, (error, response) => {
+
+      let code = 200
+      let message = "Email sent successfully!"
+
+      if (error) {
+        console.error(error);
+        console.error("[ERROR] Email not sent.")
+        code = 500
+        message = "Email not sent. Something went wrong"
+        
+      } else {
+        console.info("[SUCCESS] Email sent to "+emailAddress)
+      }
+
+      smtpTransport.close();
+      return { code : code, message : message }
+      
+    })
+
+  }
 
 })
