@@ -249,11 +249,9 @@ exports.onAppointmentCancellation = functions.firestore.document('appointments/{
 
 })
 
-exports.onClinicCreate = functions.firestore.document('clinics/{userId}').onCreate( async (snap , context) => {
+exports.onClinicCreate = functions.firestore.document('clinics/{clinicId}').onCreate( async (snap , context) => {
 
   let newClinic = snap.data()
-
-  let subscriptionPlan = await admin.firestore().collection('subscriptionPlans').doc(newClinic.planId).get()
 
   const smtpTransport = mailer.createTransport({
     service: "gmail",
@@ -273,29 +271,9 @@ exports.onClinicCreate = functions.firestore.document('clinics/{userId}').onCrea
               <h2 style="text-align: center; font-weight: 700; color : #3E6680; ">Welcome to medXpert!</h2>
             </div>
             <div style="margin-top: 50px; color: black;">
-              <p>Hi ${newClinic.name},</p>
+              <p>Hi ${newClinic.ownerName},</p>
               <br/>
               <p>Our team would like to extend gratitude for registering for our web app. We will do our best to provide you streamline care which is fast, efficient, and effective.</p>
-              <br/>
-              <p>Subscription details</p>
-              <table style="width: 100%">
-                <thead>
-                  <tr>
-                    <th style="text-align: center; border: 1px solid black;">Description</th>
-                    <th style="text-align: center; border: 1px solid black;">No. of users</th>
-                    <th style="text-align: center; border: 1px solid black;">Monthly Fees</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style="text-align: center; border: 1px solid black;">${subscriptionPlan.data().description}</td>
-                    <td style="text-align: center; border: 1px solid black;">${subscriptionPlan.data().noOfUsers}</td>
-                    <td style="text-align: center; border: 1px solid black;">PhP ${subscriptionPlan.data().monthlyFees.toFixed(2)}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <br/>
-              <p>If you wish to upgrade your plan. Contact us through email at medexpert.noreplymail@gmail.com</p>
               <br/>
               <br/>
               <p>Yours truly,</p>
