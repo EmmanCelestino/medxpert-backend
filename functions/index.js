@@ -313,3 +313,106 @@ exports.onClinicCreate = functions.firestore.document('clinics/{clinicId}').onCr
   })
 
 })
+
+exports.addClinicAdmin = functions.https.onCall( (data, context) => {
+
+  return new Promise ( (resolve, reject) => {
+
+    try{
+
+      var password = generator.generate({
+        length : 8,
+        numbers : true
+      })
+  
+      admin.auth().createUser({
+        email: data.emailAddress,
+        emailVerified: true,
+        password: password,
+        displayName: data.fullName,
+        disabled: false, 
+      }).then( userRecord => {
+  
+        console.log('Successfully created new clinic admin:', userRecord.uid)
+
+        const smtpTransport = mailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: functions.config().gmail.email_address,
+            pass: functions.config().gmail.passkey
+          }
+        })
+        
+        const mail = {
+          from: functions.config().gmail.email_address,
+          to: data.emailAddress,
+          subject: "Welcome to medXpert",
+          text: "",
+          html: `<div>
+            <p>Hi ${data.firstName},</p>
+            <br/>
+            <p>Welcome to medXpert!</p>
+            <p>You are now a clinic admin. You can login to the web app with the following credentials.</p>
+            <p>Email : ${data.emailAddress}</p>
+            <p>Password : ${password}</p>
+            <br/>
+            <br/>
+            <p>Thank you!</p>
+            <br/>
+            <br/>
+            <p>Yours truly,</p>
+            <p>Our medXpert team</p>
+          </div>`
+        }
+        
+        smtpTransport.sendMail(mail, (error, response) => {
+          if (error) {
+            console.log(error);
+          } else {
+            console.log(response);
+            res.status(200).send({
+              code : 2000,
+              data : response,
+              message : "Success"
+            })
+          }
+          smtpTransport.close();
+        })
+  
+        resolve({
+          code : 200,
+          data : {
+            user : {...userRecord},
+            password : password
+          }
+        })
+
+        return
+  
+      }).catch((error) => {
+        
+        console.log('Error creating new admin:', error);
+        
+        resolve({
+          code : 500,
+          error : error
+        })
+
+        return
+  
+      });
+  
+    }catch(error){
+  
+      resolve({
+        code : 500,
+        error : error
+      })
+
+      return
+  
+    }
+
+  })
+
+})
