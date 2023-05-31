@@ -329,7 +329,7 @@ exports.addClinicAdmin = functions.https.onCall( (data, context) => {
         email: data.emailAddress,
         emailVerified: true,
         password: password,
-        displayName: data.fullName,
+        displayName: data.firstName + " " + data.lastName,
         disabled: false, 
       }).then( userRecord => {
   
